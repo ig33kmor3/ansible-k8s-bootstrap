@@ -20,8 +20,8 @@ The ```kcli_version``` is the version of kubeadmn that is avaiable in the Ubuntu
 ## DEPLOYMENT
 Run the following command on systems that REQUIRE a sudo password to escalate priviledges:
 
-```ansible-playbook playbook.yaml -i inventory.txt -K```
+```ansible-playbook playbook.yaml -i inventory.ini -K```
 
 Run the following command on systems that DO NOT REQUIRE a sudo password to escalate priviledges:
 
-```ansible-playbook playbook.yaml -i inventory.txt```
+```ansible-playbook playbook.yaml -i inventory.ini```
