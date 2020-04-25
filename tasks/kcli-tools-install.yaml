@@ -1,0 +1,64 @@
+# check if kubeadm is installed before proceeding
+- name: check if kubeadm is already installed
+  shell: dpkg -l | grep -i 'kubeadm'
+  args:
+    executable: /bin/bash
+  register: kubeadm_output
+  failed_when: kubeadm_output.stderr != ""
+
+# disable swap in current runtime
+- name: disable swap in current runtime
+  shell: swapoff -a
+  args:
+    executable: /bin/bash
+  when: kubeadm_output.stdout == ''
+
+# disable swap permanently
+- name: disable swap permanently on reboot
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+  when: kubeadm_output.stdout == ''
+
+# install required repo packages
+- name: install kcli tools dependencies
+  apt:
+    pkg:
+      - apt-transport-https
+      - curl
+    state: present
+    update_cache: yes
+  when: kubeadm_output.stdout == ''
+
+# add docker gpg key to talk to repo
+- name: add kubernetes gpg key
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+  when: kubeadm_output.stdout == ''
+
+# add kubernetes repo to host
+- name: add kubernetes package repository
+  apt_repository:
+    repo: 'deb https://apt.kubernetes.io/ kubernetes-xenial main'
+    state: present
+  when: kubeadm_output.stdout == ''
+
+# install kubernetes cli tools on host
+- name: install kcli tools on hosts
+  apt:
+    pkg:
+      - "kubelet={{ kcli_version }}"
+      - "kubeadm={{ kcli_version }}"
+      - "kubectl={{ kcli_version }}"
+    state: present
+    update_cache: yes
+  when: kubeadm_output.stdout == ''
+
+# mark kcli tools on hold to prevent upgrades
+- name: apt-mark kcli tools as hold
+  shell: apt-mark hold kubelet kubeadm kubectl
+  args:
+    executable: /bin/bash
+  when: kubeadm_output.stdout == ''

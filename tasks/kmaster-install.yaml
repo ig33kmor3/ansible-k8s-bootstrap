@@ -1,0 +1,118 @@
+# copy kubernetes master bare metal configuration to master node
+- name: copy kubernetes config to master - bare-metal
+  copy:
+    content: "{{lookup('template', '../artifacts/bare/master-config.yaml.j2')}}"
+    dest: /tmp/master-config.yaml
+  when: k8s_environment == "bare-metal"
+
+# copy kubernetes master aws configuration to master node
+- name: copy kubernetes config to master - aws
+  copy:
+    content: "{{lookup('template', '../artifacts/aws/master-config.yaml.j2')}}"
+    dest: /tmp/master-config.yaml
+  when: k8s_environment == "aws"
+
+# configure docker for kubernetes deployment
+- name: configure docker for kubernetes
+  shell: 
+    cmd: |
+      cat > /etc/docker/daemon.json <<EOF
+      {
+        "exec-opts": ["native.cgroupdriver=systemd"],
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m"
+        },
+        "storage-driver": "overlay2"
+      }
+      EOF
+      mkdir -p /etc/systemd/system/docker.service.d
+  args:
+    executable: /bin/bash
+
+# restart docker to pickup cgroup configuration
+- name: restarting docker to apply new cgroup configuration
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    name: docker
+
+# run kubeadmn init
+- name: execute kubeadm init with ClusterConfiguration config
+  shell: |
+    kubeadm init \
+      --skip-token-print \
+      --skip-certificate-key-print \
+      --config /tmp/master-config.yaml
+  args:
+    executable: /bin/bash
+
+# copy kube config to ansible logged in user
+- name: creating kube config directory
+  file:
+    path: /home/{{ ansible_user }}/.kube
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+
+# copy kube config to ansible logged in user
+- name: moving kube config to logged in user directory
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/{{ ansible_user }}/.kube/config
+    mode: '0644'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    remote_src: yes
+
+# copy kubernetes config to local host running ansible
+- name: copying kube config to local Downloads folder
+  fetch:
+    src: /home/{{ ansible_user }}/.kube/config
+    dest: ~/kubeconfig
+    flat: yes
+
+# install pod network using calico
+- name: install calico pod network
+  shell: kubectl apply -f {{ pod_network_calico }}
+  args:
+    executable: /bin/bash
+  become: no
+
+# create join command variables - endpoint, token, ca
+- name: kubeadm token create parameters
+  shell: |
+    kubeadm token create --print-join-command > join.config
+    cat join.config | grep -iow '[0-9]*\.[0-9]*\.[0-9]*\.[0-9]*:6443'
+    cat join.config | grep -iow '[a-z0-9]\{6\}.[a-z0-9]\{16\}' | head -n 1
+    cat join.config | grep -iow 'sha[0-9A-Za-z:]*' | head -n 1
+  args:
+    executable: /bin/bash
+  register: token_output
+  become: no
+
+# set a fact with token variables for resuse in other playbook
+- name: setting master facts for resuse in workers
+  set_fact:
+    endpoint: "{{ token_output.stdout_lines[0] }}"
+    token: "{{ token_output.stdout_lines[1] }}"
+    ca_hash: "{{ token_output.stdout_lines[2] }}"
+
+# remove join.config from host 
+- name: cleanup join.config file on master
+  file:
+    path: /home/{{ ansible_user }}/join.config
+    state: absent
+  become: no
+
+# remove master-config from host 
+- name: cleanup master-config file on master
+  file:
+    path: /tmp/master-config.yaml
+    state: absent
+
+# let cluster build is complete
+- name: print cluster master status 
+  debug:
+    msg: "Play successsfuly added Kubernetes MASTER to cluster!"

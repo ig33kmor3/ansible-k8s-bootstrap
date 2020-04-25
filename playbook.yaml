@@ -1,0 +1,39 @@
+---
+# install prerequisites
+- name: Prerequisites Installation Playbook
+  hosts: all
+  become: yes
+  become_method: sudo
+  tasks:
+    # install docker container runtime
+    - include: tasks/docker-install.yaml
+    # install kcli tools - kubelet kubeadm kubectl
+    - include: tasks/kcli-tools-install.yaml
+
+# install kubernetes masters
+- name: Kubernetes Master Installation Playbook
+  hosts: masters[0]
+  serial: 1
+  become: yes
+  become_method: sudo
+  tasks:
+    # install kubernetes master 
+    - include: tasks/kmaster-install.yaml
+
+# install kubernetes workers
+- name: Kubernetes Worker Installation Playbook
+  hosts: workers
+  become: yes
+  become_method: sudo
+  tasks:
+    # install kubernetes worker 
+    - include: tasks/kworker-install.yaml
+
+# install kubernetes accessories
+- name: Kubernetes Accessories Installation Playbook
+  hosts: all
+  become: yes
+  become_method: sudo
+  tasks:
+    # install kubernetes accessories
+    - include: tasks/kaccessory-install.yaml

@@ -1,0 +1,10 @@
+# label worker nodes
+- name: label worker node roles
+  shell: |
+    kubectl label node {{ hostvars[item]['ansible_hostname'] }} \
+      node-role.kubernetes.io/worker=worker --overwrite
+  args:
+    executable: /bin/bash
+  become: no
+  loop: "{{ groups['workers'] }}"
+  when: inventory_hostname_short == groups['masters'][0]

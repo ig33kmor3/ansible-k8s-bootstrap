@@ -1,0 +1,63 @@
+# set a fact with token variables for resuse in other playbook
+- name: setting worker facts from master hostvars
+  set_fact:
+    endpoint: "{{ hostvars[groups['masters'][0]]['endpoint'] }}"
+    token: "{{ hostvars[groups['masters'][0]]['token'] }}"
+    ca_hash: "{{ hostvars[groups['masters'][0]]['ca_hash'] }}"
+
+# copy kubernetes worker bare metal configuration to worker node
+- name: copy kubernetes config to worker - bare-metal
+  copy:
+    content: "{{lookup('template', '../artifacts/bare/worker-config.yaml.j2')}}"
+    dest: /tmp/worker-config.yaml
+  when: k8s_environment == "bare-metal"
+
+# copy kubernetes worker aws configuration to worker node
+- name: copy kubernetes config to worker - aws
+  copy:
+    content: "{{lookup('template', '../artifacts/aws/worker-config.yaml.j2')}}"
+    dest: /tmp/worker-config.yaml
+  when: k8s_environment == "aws"
+
+# configure docker for kubernetes deployment
+- name: configure docker for kubernetes
+  shell: 
+    cmd: |
+      cat > /etc/docker/daemon.json <<EOF
+      {
+        "exec-opts": ["native.cgroupdriver=systemd"],
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m"
+        },
+        "storage-driver": "overlay2"
+      }
+      EOF
+      mkdir -p /etc/systemd/system/docker.service.d
+  args:
+    executable: /bin/bash
+
+# restart docker to pickup cgroup configuration
+- name: restarting docker to apply new cgroup configuration
+  systemd:
+    state: restarted
+    daemon_reload: yes
+    name: docker
+
+# run kubeadmn join
+- name: execute kubeadm join with JoinConfiguration config
+  shell: |
+    kubeadm join --config /tmp/worker-config.yaml
+  args:
+    executable: /bin/bash
+
+# remove worker-config from host 
+- name: cleanup worker-config file on worker
+  file:
+    path: /tmp/worker-config.yaml
+    state: absent
+
+# let user know cluster build is complete
+- name: print cluster worker status 
+  debug:
+    msg: "Play successsfuly added Kubernetes WORKER to cluster! Remaining plays/tasks are accessory!"

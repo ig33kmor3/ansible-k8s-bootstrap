@@ -1,0 +1,58 @@
+# check if docker is installed before proceeding
+- name: check if docker is already installed
+  shell: dpkg -l | grep -i 'docker-ce'
+  args:
+    executable: /bin/bash
+  register: docker_output
+  failed_when: docker_output.stderr != ""
+
+# install required repo packages
+- name: install docker package dependencies
+  apt:
+    pkg:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg-agent
+      - software-properties-common
+    state: present
+    update_cache: yes
+  when: docker_output.stdout == ''
+
+# add docker gpg key to talk to repo
+- name: add docker gpg key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg 
+    state: present
+  when: docker_output.stdout == ''
+
+# add docker repo to host
+- name: update host package repository
+  shell: |
+    add-apt-repository \
+        "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+        $(lsb_release -cs) \
+        stable" -y
+  args:
+    executable: /bin/bash
+  when: docker_output.stdout == ''
+
+
+# install docker on host
+- name: update host package repository
+  apt:
+    pkg:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: yes
+  when: docker_output.stdout == ''
+
+# add user to manage docker
+- name: add user to docker group for management
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  when: docker_output.stdout == ''
