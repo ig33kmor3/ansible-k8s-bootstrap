@@ -15,7 +15,7 @@ In ```inventory.ini``` set hostnames and the remote user for Ansible to target d
 - ```cert_sans=["name", "name.domain.com"]```
 - ```pod_network_calico=https://docs.projectcalico.org/v3.11/manifests/calico.yaml```
 
-The ```kcli_version``` is the version of kubeadmn that is avaiable in the Ubuntu repoistory. It can be found by running ```sudo apt-cache policy kubeadm``` after repository is added. The ```k8s_environment``` can be set to either ```aws``` or ```bare-metal```. Set to ```aws``` when you want to leverage the AWS Cloud Provider during Ansible bootstrap.
+The ```kcli_version``` is the version of kubeadm that is avaiable in the Ubuntu repoistory. It can be found by running ```sudo apt-cache policy kubeadm``` after repository is added. The ```k8s_environment``` can be set to either ```aws``` or ```bare-metal```. Set to ```aws``` when you want to leverage the AWS Cloud Provider during Ansible bootstrap.
     
 ## DEPLOYMENT
 Run the following command on systems that REQUIRE a sudo password to escalate priviledges:
